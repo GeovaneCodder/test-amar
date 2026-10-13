@@ -18,7 +18,7 @@ final readonly class Money
         $amount = str_replace(',', '.', (string) $amount);
 
         if (! preg_match('/^\d{1,15}(?:\.\d{1,2})?$/', $amount)) {
-            throw new InvalidArgumentException('O valor monetário é inválido.');
+            throw new InvalidArgumentException('The monetary amount is invalid.');
         }
 
         [$units, $fraction] = array_pad(explode('.', $amount, 2), 2, '');

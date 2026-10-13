@@ -108,7 +108,7 @@ final class ProcessImportChunk
             $this->markFailed($importId, $exception->getMessage());
         } catch (Throwable $exception) {
             $this->imports->deleteTransactions($importId);
-            $this->markFailed($importId, 'Falha ao processar o CSV: '.$exception->getMessage());
+            $this->markFailed($importId, 'Failed to process the CSV: '.$exception->getMessage());
             throw $exception;
         }
     }
@@ -122,7 +122,7 @@ final class ProcessImportChunk
         }
 
         $this->imports->deleteTransactions($importId);
-        $this->markFailed($importId, 'A fila esgotou as tentativas: '.$exception->getMessage());
+        $this->markFailed($importId, 'The job exhausted its retry attempts: '.$exception->getMessage());
 
         TransactionsImported::dispatch($import->userId);
     }

@@ -65,6 +65,7 @@ class ImportTest extends TestCase
         $this->assertSame(11534600, $user->transactions()->where('type', 'income')->value('amount_minor'));
         $this->assertSame(43320900, $user->transactions()->where('type', 'expense')->value('amount_minor'));
         $this->assertSame(4, $import->errors[0]['row']);
+        $this->assertSame('The date must use the YYYY-MM-DD format.', $import->errors[0]['message']);
 
         app()->call([new ProcessImportChunkJob($import->id), 'handle']);
 
@@ -103,6 +104,31 @@ class ImportTest extends TestCase
 
         $import->refresh();
         $this->assertSame('failed', $import->status);
-        $this->assertStringContainsString('cabeçalho', $import->errors[0]['message']);
+        $this->assertStringContainsString('header', $import->errors[0]['message']);
+    }
+
+    public function test_import_state_transitions_return_english_messages(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $import = Import::create([
+            'user_id' => $user->id,
+            'file_path' => 'imports/transitions.csv',
+            'fingerprint' => hash('sha256', 'imports/transitions.csv'),
+            'status' => 'processing',
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/imports/{$import->id}/pause")
+            ->assertOk()
+            ->assertJsonPath('message', 'Import paused.');
+
+        $this->postJson("/api/imports/{$import->id}/resume")
+            ->assertOk()
+            ->assertJsonPath('message', 'Import resumed.');
+
+        $this->postJson("/api/imports/{$import->id}/cancel")
+            ->assertOk()
+            ->assertJsonPath('message', 'Import cancelled.');
     }
 }

@@ -22,25 +22,25 @@ final readonly class CsvRow
     public function toTransactionData(int $userId, int $importId): CreateTransactionData
     {
         if (! $this->wellFormed) {
-            throw new InvalidArgumentException('O número de colunas da linha é inválido.');
+            throw new InvalidArgumentException('The row has an invalid number of columns.');
         }
 
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', $this->date);
 
         if ($date === false || $date->format('Y-m-d') !== $this->date) {
-            throw new InvalidArgumentException('A data deve usar o formato AAAA-MM-DD.');
+            throw new InvalidArgumentException('The date must use the YYYY-MM-DD format.');
         }
 
         $description = trim($this->description);
 
         if ($description === '' || mb_strlen($description) > 255) {
-            throw new InvalidArgumentException('A descrição é obrigatória e deve ter até 255 caracteres.');
+            throw new InvalidArgumentException('The description is required and must not exceed 255 characters.');
         }
 
         $amount = Money::fromDecimal($this->amount);
 
         if ($amount->minorUnits <= 0) {
-            throw new InvalidArgumentException('O valor deve ser maior que zero.');
+            throw new InvalidArgumentException('The amount must be greater than zero.');
         }
 
         return new CreateTransactionData(

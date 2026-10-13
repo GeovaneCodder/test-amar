@@ -14,7 +14,7 @@ enum TransactionType: string
         return match (mb_strtolower(trim($type))) {
             'income', 'receita' => self::Income,
             'expense', 'despesa' => self::Expense,
-            default => throw new InvalidArgumentException('O tipo deve ser Receita ou Despesa.'),
+            default => throw new InvalidArgumentException('The type must be income or expense.'),
         };
     }
 

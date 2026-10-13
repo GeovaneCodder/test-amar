@@ -49,6 +49,14 @@ class AuthenticationTest extends TestCase
         $this->postJson('/api/imports')->assertUnauthorized();
     }
 
+    public function test_logout_returns_an_english_confirmation_message(): void
+    {
+        $this->actingAs(User::factory()->create(), 'sanctum')
+            ->postJson('/api/logout')
+            ->assertOk()
+            ->assertJsonPath('message', 'Session ended.');
+    }
+
     public function test_invalid_credentials_are_rejected(): void
     {
         $user = User::factory()->create();
@@ -56,6 +64,6 @@ class AuthenticationTest extends TestCase
         $this->postJson('/api/login', [
             'email' => $user->email,
             'password' => 'incorrect-password',
-        ])->assertUnauthorized()->assertJsonPath('message', 'As credenciais informadas são inválidas.');
+        ])->assertUnauthorized()->assertJsonPath('message', 'The provided credentials are invalid.');
     }
 }

@@ -16,7 +16,7 @@ final class PauseImport
         $import = $this->imports->find($importId);
 
         if ($import === null || $import->userId !== $userId || $import->status !== ImportStatus::Processing) {
-            throw new ImportNotProcessableException('Esta importação não pode ser pausada.');
+            throw new ImportNotProcessableException('This import cannot be paused.');
         }
 
         $this->imports->updateProgress($importId, new ImportProgressData(status: ImportStatus::Paused));

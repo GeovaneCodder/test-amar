@@ -12,7 +12,7 @@ final readonly class TransactionPeriod
         public ?DateTimeImmutable $to = null,
     ) {
         if ($from !== null && $to !== null && $from > $to) {
-            throw new InvalidArgumentException('A data inicial deve ser anterior à data final.');
+            throw new InvalidArgumentException('The start date must be before or equal to the end date.');
         }
     }
 

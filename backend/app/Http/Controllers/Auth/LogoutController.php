@@ -18,6 +18,6 @@ class LogoutController extends Controller
             $token instanceof PersonalAccessToken ? $token->id : null,
         );
 
-        return response()->json(['message' => 'Sessão encerrada.']);
+        return response()->json(['message' => 'Session ended.']);
     }
 }

@@ -13,7 +13,7 @@ final class Sha256FileFingerprint implements FileFingerprint
         $fingerprint = hash_file('sha256', Storage::disk('local')->path($path));
 
         if ($fingerprint === false) {
-            throw new RuntimeException('Não foi possível calcular a assinatura do arquivo.');
+            throw new RuntimeException('Unable to calculate the file fingerprint.');
         }
 
         return $fingerprint;

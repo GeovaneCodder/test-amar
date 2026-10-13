@@ -16,7 +16,7 @@ final class RedisDashboardCache
         );
 
         if (! $summary instanceof DashboardSummaryData) {
-            throw new \UnexpectedValueException('O cache do dashboard contém um formato inválido.');
+            throw new \UnexpectedValueException('The dashboard cache contains an invalid format.');
         }
 
         return $summary;

@@ -48,21 +48,21 @@ class ImportController extends Controller
     {
         $this->runTransition(fn () => $pause->execute($import, $request->user()->id));
 
-        return response()->json(['message' => 'Importação pausada.']);
+        return response()->json(['message' => 'Import paused.']);
     }
 
     public function resume(Request $request, int $import, ResumeImport $resume): JsonResponse
     {
         $this->runTransition(fn () => $resume->execute($import, $request->user()->id));
 
-        return response()->json(['message' => 'Importação retomada.']);
+        return response()->json(['message' => 'Import resumed.']);
     }
 
     public function cancel(Request $request, int $import, CancelImport $cancel): JsonResponse
     {
         $this->runTransition(fn () => $cancel->execute($import, $request->user()->id));
 
-        return response()->json(['message' => 'Importação cancelada.']);
+        return response()->json(['message' => 'Import cancelled.']);
     }
 
     private function runTransition(callable $transition): void

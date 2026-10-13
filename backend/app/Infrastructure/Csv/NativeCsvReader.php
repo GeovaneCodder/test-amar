@@ -15,14 +15,14 @@ final class NativeCsvReader implements CsvReader
         $stream = Storage::disk('local')->readStream($path);
 
         if (! is_resource($stream)) {
-            throw new RuntimeException('Não foi possível abrir o arquivo CSV.');
+            throw new RuntimeException('Unable to open the CSV file.');
         }
 
         try {
             $headers = fgetcsv($stream, escape: '');
 
             if ($headers === false) {
-                throw new ImportNotProcessableException('O arquivo CSV está vazio.');
+                throw new ImportNotProcessableException('The CSV file is empty.');
             }
 
             $headers[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $headers[0]);
@@ -30,7 +30,7 @@ final class NativeCsvReader implements CsvReader
             $required = ['date', 'description', 'amount', 'type'];
 
             if (count(array_unique($headers)) !== count($headers) || array_diff($required, $headers) !== []) {
-                throw new ImportNotProcessableException('O cabeçalho deve conter date, description, amount e type.');
+                throw new ImportNotProcessableException('The header must contain date, description, amount, and type.');
             }
 
             $indexes = array_flip($headers);

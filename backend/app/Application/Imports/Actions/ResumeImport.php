@@ -16,8 +16,8 @@ final class ResumeImport
     {
         $import = $this->imports->find($importId);
 
-        if ($import === null || $import->userId !== $userId || ! $import->canProcess()) {
-            throw new ImportNotProcessableException('Esta importação não pode ser retomada.');
+        if ($import === null || $import->userId !== $userId || ! $import->status->canProcess()) {
+            throw new ImportNotProcessableException('This import cannot be resumed.');
         }
 
         $this->imports->updateProgress($importId, new ImportProgressData(status: ImportStatus::Pending));

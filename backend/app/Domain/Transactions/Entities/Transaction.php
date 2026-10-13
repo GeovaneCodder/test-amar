@@ -19,15 +19,15 @@ final readonly class Transaction
         public ?int $importId = null,
     ) {
         if ($userId < 1 || ($importId !== null && $importId < 1)) {
-            throw new InvalidArgumentException('A transação deve pertencer a um usuário e importação válidos.');
+            throw new InvalidArgumentException('The transaction must belong to a valid user and import.');
         }
 
         if ($description === '' || mb_strlen($description) > 255) {
-            throw new InvalidArgumentException('A descrição é obrigatória e deve ter até 255 caracteres.');
+            throw new InvalidArgumentException('The description is required and must not exceed 255 characters.');
         }
 
         if ($amount->minorUnits <= 0) {
-            throw new InvalidArgumentException('O valor da transação deve ser maior que zero.');
+            throw new InvalidArgumentException('The transaction amount must be greater than zero.');
         }
     }
 }

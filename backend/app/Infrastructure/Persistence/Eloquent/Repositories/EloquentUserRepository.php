@@ -28,7 +28,7 @@ final class EloquentUserRepository implements UserRepository
         $user = User::query()->where('email', $data->email)->first();
 
         if ($user === null || ! Hash::check($data->password, $user->password)) {
-            throw new InvalidCredentialsException('As credenciais informadas são inválidas.');
+            throw new InvalidCredentialsException('The provided credentials are invalid.');
         }
 
         return $this->createTokenData($user, $data->deviceName);
