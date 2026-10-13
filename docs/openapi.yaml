@@ -1,0 +1,596 @@
+openapi: 3.0.3
+info:
+  title: Amar Assist Finance API
+  version: 1.0.0
+  description: |
+    REST API for financial transactions, dashboard summaries, and asynchronous CSV imports.
+    All endpoints except registration and login require a Laravel Sanctum bearer token.
+servers:
+  - url: http://localhost/api
+    description: Local development
+tags:
+  - name: Authentication
+  - name: Dashboard
+  - name: Transactions
+  - name: Imports
+paths:
+  /register:
+    post:
+      tags: [Authentication]
+      summary: Register a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              name: Jane Doe
+              email: jane@example.com
+              password: secure-password
+              password_confirmation: secure-password
+      responses:
+        '201':
+          description: User registered and API token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /login:
+    post:
+      tags: [Authentication]
+      summary: Log in and issue a Sanctum token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: jane@example.com
+              password: secure-password
+              device_name: api-client
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: The provided credentials are invalid.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke the current API token
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Token revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Session ended.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /user:
+    get:
+      tags: [Authentication]
+      summary: Get the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authenticated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Get income, expenses, and balance totals
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard totals for the authenticated user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DashboardSummary'
+              example:
+                data:
+                  income: '1250.00'
+                  expenses: '320.50'
+                  balance: '929.50'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /transactions:
+    get:
+      tags: [Transactions]
+      summary: List the authenticated user's transactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          description: Optional transaction type filter
+          schema:
+            type: string
+            enum: [income, expense, Receita, Despesa]
+        - name: date_from
+          in: query
+          description: Include transactions on or after this date
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: Include transactions on or before this date
+          schema:
+            type: string
+            format: date
+        - name: search
+          in: query
+          description: Search transaction descriptions
+          schema:
+            type: string
+            maxLength: 255
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Paginated transaction list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionCollection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      tags: [Transactions]
+      summary: Create a transaction
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoreTransactionRequest'
+            example:
+              date: '2026-10-13'
+              description: Client payment
+              amount: '125.75'
+              type: income
+      responses:
+        '201':
+          description: Transaction created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Transaction'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /imports:
+    post:
+      tags: [Imports]
+      summary: Upload a CSV file for asynchronous transaction import
+      description: |
+        Upload a CSV with the columns `date,description,amount,type`.
+        Dates must use `YYYY-MM-DD`; amounts are decimal values with up to two fractional digits.
+        Types may be `income`/`expense` or `Receita`/`Despesa`.
+        The response is returned after the import job has been queued. Use `GET /imports/{import}`
+        to poll its status.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV or TXT file, up to 10 MiB
+      responses:
+        '202':
+          description: Import accepted and queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Import'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /imports/{import}:
+    parameters:
+      - $ref: '#/components/parameters/ImportId'
+    get:
+      tags: [Imports]
+      summary: Get import status and row-level errors
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Import status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Import'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /imports/{import}/pause:
+    parameters:
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      summary: Pause a processing import
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/ImportTransition'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /imports/{import}/resume:
+    parameters:
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      summary: Resume a paused import
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/ImportTransition'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /imports/{import}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      summary: Cancel an unfinished import
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/ImportTransition'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum API token
+  parameters:
+    ImportId:
+      name: import
+      in: path
+      required: true
+      description: Numeric import ID
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageResponse'
+          example:
+            message: Unauthenticated.
+    NotFound:
+      description: Import not found or not owned by the authenticated user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageResponse'
+          example:
+            message: Not Found
+    Conflict:
+      description: Requested import state transition is not allowed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageResponse'
+          example:
+            message: This import cannot be paused.
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          example:
+            message: The given data was invalid.
+            errors:
+              amount:
+                - The amount must be greater than 0.
+    ImportTransition:
+      description: Import state updated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageResponse'
+          examples:
+            paused:
+              value:
+                message: Import paused.
+            resumed:
+              value:
+                message: Import resumed.
+            cancelled:
+              value:
+                message: Import cancelled.
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password, password_confirmation]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        password:
+          type: string
+          format: password
+          minLength: 8
+        password_confirmation:
+          type: string
+          format: password
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        device_name:
+          type: string
+          maxLength: 100
+          default: api
+    StoreTransactionRequest:
+      type: object
+      required: [date, description, amount, type]
+      properties:
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+          maxLength: 255
+        amount:
+          type: string
+          pattern: '^\d{1,15}(?:[.,]\d{1,2})?$'
+          example: '125.75'
+        type:
+          type: string
+          enum: [income, expense, Receita, Despesa]
+    AuthenticationResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [user, token]
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            token:
+              type: string
+              description: Sanctum bearer token; store securely and send in the Authorization header
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        email_verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    DashboardSummary:
+      type: object
+      required: [income, expenses, balance]
+      properties:
+        income:
+          type: string
+          description: Total income formatted as a decimal amount
+          example: '1250.00'
+        expenses:
+          type: string
+          description: Total expenses formatted as a decimal amount
+          example: '320.50'
+        balance:
+          type: string
+          description: Income minus expenses
+          example: '929.50'
+    Transaction:
+      type: object
+      required: [id, date, description, amount, type, created_at]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+        amount:
+          type: string
+          description: Decimal amount
+          example: '125.75'
+        type:
+          type: string
+          enum: [income, expense]
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+    TransactionCollection:
+      type: object
+      required: [data, links, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+        links:
+          type: object
+          properties:
+            first:
+              type: string
+              nullable: true
+            last:
+              type: string
+              nullable: true
+            prev:
+              type: string
+              nullable: true
+            next:
+              type: string
+              nullable: true
+        meta:
+          type: object
+          properties:
+            current_page:
+              type: integer
+            from:
+              type: integer
+              nullable: true
+            last_page:
+              type: integer
+            per_page:
+              type: integer
+            to:
+              type: integer
+              nullable: true
+            total:
+              type: integer
+    Import:
+      type: object
+      required: [id, status, total_rows, processed_rows, imported_rows, failed_rows, errors, created_at]
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum: [pending, processing, paused, completed, completed_with_errors, failed, cancelled]
+        total_rows:
+          type: integer
+        processed_rows:
+          type: integer
+        imported_rows:
+          type: integer
+        failed_rows:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportRowError'
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+    ImportRowError:
+      type: object
+      required: [row, message]
+      properties:
+        row:
+          type: integer
+          nullable: true
+          description: One-based CSV line number, including the header; null for a file-level error
+        message:
+          type: string
+          description: Error description in English
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    ValidationError:
+      type: object
+      required: [message, errors]
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
