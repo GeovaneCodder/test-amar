@@ -1,0 +1,1 @@
+Para subir a aplicação orquestrada localmente: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
