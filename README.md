@@ -11,12 +11,16 @@ e caso SHA-256 e caso o usuário logado tentar fazer o upload da última planilh
 o sistema não faz nada.
 Os testes unitários serão executados pelo GitHub Actions somente em ambiente de develop(usando o sqlite).
 
-Para realizar o teste de notificação, pause o a fila:
-- docker compose stop queue
+## Para realizar o teste de notificação, pause o a fila:
+```text
+docker compose stop queue
+```
 Faça o upload de uma planilha qualquer, observe que o progress bar ficará em loop, o cliente poderá sair
 da sessão upload normalmente, então suba novamente o container onde tem o work de processamento de filas
 
-- docker compose start queue
+```text
+docker compose start queue
+```
 A fila deverá ser processada e um toast deverá ser exibido na tela.
 
 ## Documentação dos enpoints backend
