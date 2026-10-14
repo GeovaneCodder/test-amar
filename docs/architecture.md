@@ -1,4 +1,5 @@
 
+<WritingBlock id="58321" variant="document">## Estrutura do projeto
 amar-assist/
 ├── backend/
 │   ├── app/
@@ -150,6 +151,7 @@ amar-assist/
 ├── .env.example
 ├── .gitignore
 └── README.md
+</WritingBlock>
 
 ## Desenvolvimento local
 
