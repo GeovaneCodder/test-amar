@@ -5,7 +5,7 @@ if [ ! -f vendor/autoload.php ]; then
     composer install --no-interaction --prefer-dist --optimize-autoloader
 fi
 
-mkdir -p storage/framework/{cache,sessions,views} storage/logs storage/app/imports bootstrap/cache
+mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs storage/app/imports bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache || true
 
 if [ -z "$APP_KEY" ]; then
@@ -15,6 +15,8 @@ if [ -z "$APP_KEY" ]; then
 fi
 
 if [ "$1" = "php-fpm" ]; then
+    rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
+    php artisan package:discover --ansi
     php artisan migrate --force --graceful
     php artisan storage:link --force >/dev/null 2>&1 || true
 fi

@@ -7,6 +7,7 @@ use App\Application\Imports\Contracts\ImportRepository;
 use App\Application\Imports\DTOs\ImportProgressData;
 use App\Domain\Imports\Enums\ImportStatus;
 use App\Domain\Imports\Exceptions\ImportNotProcessableException;
+use App\Events\ImportFinished;
 use App\Events\ImportProgressUpdated;
 use App\Events\TransactionsImported;
 use InvalidArgumentException;
@@ -101,11 +102,11 @@ final class ProcessImportChunk
                 errors: $errors,
             ));
 
-            if ($imported > 0) {
-                TransactionsImported::dispatch($import->userId);
-            }
+            TransactionsImported::dispatch($import->userId);
+            $this->broadcastFinished($importId);
         } catch (ImportNotProcessableException $exception) {
             $this->markFailed($importId, $exception->getMessage());
+            $this->broadcastFinished($importId);
         } catch (Throwable $exception) {
             $this->imports->deleteTransactions($importId);
             $this->markFailed($importId, 'Failed to process the CSV: '.$exception->getMessage());
@@ -125,6 +126,7 @@ final class ProcessImportChunk
         $this->markFailed($importId, 'The job exhausted its retry attempts: '.$exception->getMessage());
 
         TransactionsImported::dispatch($import->userId);
+        $this->broadcastFinished($importId);
     }
 
     private function updateProgress(int $importId, int $processed, int $imported, int $failed, array $errors): void
@@ -154,6 +156,15 @@ final class ProcessImportChunk
             status: ImportStatus::Failed,
             errors: array_slice($errors, 0, 100),
         ));
+    }
+
+    private function broadcastFinished(int $importId): void
+    {
+        $import = $this->imports->find($importId);
+
+        if ($import !== null) {
+            ImportFinished::dispatch($import->userId, $import);
+        }
     }
 
     private function finishInterruptedImport(

@@ -33,13 +33,56 @@ class GetDashboardSummaryTest extends TestCase
 
         Cache::shouldReceive('remember')
             ->once()
-            ->withArgs(fn (string $key, $ttl, callable $callback): bool => $key === 'dashboard:summary:12'
-                && $callback() instanceof DashboardSummaryData)
+            ->withArgs(function (string $key, $ttl, callable $callback): bool {
+                self::assertSame('dashboard:summary:v3:12', $key);
+                self::assertIsArray($callback());
+
+                return true;
+            })
+            ->andReturn([
+                'income_minor' => 25000,
+                'expenses_minor' => 7500,
+                'balance_minor' => 17500,
+            ]);
+
+        $summary = (new GetDashboardSummary($repository, new RedisDashboardCache))->execute(12);
+
+        self::assertSame([
+            'income' => '250.00',
+            'expenses' => '75.00',
+            'balance' => '175.00',
+        ], $summary->toArray());
+    }
+
+    public function test_invalid_dashboard_cache_value_is_rebuilt(): void
+    {
+        $repository = Mockery::mock(TransactionRepository::class);
+        $repository->shouldReceive('dashboardTotals')
+            ->once()
+            ->with(12)
             ->andReturn(new DashboardSummaryData(
                 Money::fromMinor(25000),
                 Money::fromMinor(7500),
                 Money::fromMinor(17500),
             ));
+
+        Cache::shouldReceive('remember')
+            ->once()
+            ->andReturn('__PHP_Incomplete_Class');
+        Cache::shouldReceive('forget')
+            ->once()
+            ->with('dashboard:summary:v3:12');
+        Cache::shouldReceive('put')
+            ->once()
+            ->with(
+                'dashboard:summary:v3:12',
+                [
+                    'income_minor' => 25000,
+                    'expenses_minor' => 7500,
+                    'balance_minor' => 17500,
+                ],
+                Mockery::type(\DateTimeInterface::class),
+            );
 
         $summary = (new GetDashboardSummary($repository, new RedisDashboardCache))->execute(12);
 

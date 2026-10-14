@@ -6,12 +6,15 @@ use App\Application\Dashboard\DTOs\DashboardSummaryData;
 use App\Application\Transactions\Contracts\TransactionRepository;
 use App\Application\Transactions\DTOs\TransactionData;
 use App\Application\Transactions\DTOs\TransactionFilterData;
+use App\Domain\Imports\Enums\ImportStatus;
 use App\Domain\Transactions\Entities\Transaction as TransactionEntity;
 use App\Domain\Transactions\Enums\TransactionType;
 use App\Domain\Transactions\ValueObjects\Money;
+use App\Infrastructure\Persistence\Eloquent\Models\Import;
 use App\Infrastructure\Persistence\Eloquent\Models\Transaction;
 use DateTimeImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 
 final class EloquentTransactionRepository implements TransactionRepository
 {
@@ -35,6 +38,8 @@ final class EloquentTransactionRepository implements TransactionRepository
             ->where('user_id', $userId)
             ->orderByDesc('transaction_date')
             ->orderByDesc('id');
+
+        $this->applyLatestImportScope($query, $userId);
 
         if ($filters->type !== null) {
             $query->where('type', $filters->type->value);
@@ -62,8 +67,10 @@ final class EloquentTransactionRepository implements TransactionRepository
 
     public function dashboardTotals(int $userId): DashboardSummaryData
     {
-        $totals = Transaction::query()
-            ->where('user_id', $userId)
+        $query = Transaction::query()->where('user_id', $userId);
+        $this->applyLatestImportScope($query, $userId);
+
+        $totals = $query
             ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN amount_minor ELSE 0 END), 0) AS income_minor', ['income'])
             ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN amount_minor ELSE 0 END), 0) AS expenses_minor', ['expense'])
             ->firstOrFail();
@@ -76,6 +83,22 @@ final class EloquentTransactionRepository implements TransactionRepository
             Money::fromMinor($expenses),
             Money::fromMinor($income - $expenses),
         );
+    }
+
+    private function applyLatestImportScope(Builder $query, int $userId): void
+    {
+        $latestImportId = Import::query()
+            ->where('user_id', $userId)
+            ->whereIn('status', [
+                ImportStatus::Completed->value,
+                ImportStatus::CompletedWithErrors->value,
+            ])
+            ->orderByDesc('id')
+            ->value('id');
+
+        if ($latestImportId !== null) {
+            $query->where('import_id', $latestImportId);
+        }
     }
 
     private function toEntity(Transaction $record): TransactionEntity

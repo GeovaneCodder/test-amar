@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\Imports;
 
+use App\Events\ImportFinished;
 use App\Infrastructure\Persistence\Eloquent\Models\Import;
 use App\Infrastructure\Persistence\Eloquent\Models\User;
 use App\Jobs\ProcessImportChunkJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -39,6 +42,7 @@ class ImportTest extends TestCase
 
     public function test_job_imports_revenue_and_expense_and_reports_invalid_rows(): void
     {
+        Event::fake([ImportFinished::class]);
         Storage::fake('local');
         $user = User::factory()->create();
         $import = Import::create([
@@ -66,6 +70,14 @@ class ImportTest extends TestCase
         $this->assertSame(43320900, $user->transactions()->where('type', 'expense')->value('amount_minor'));
         $this->assertSame(4, $import->errors[0]['row']);
         $this->assertSame('The date must use the YYYY-MM-DD format.', $import->errors[0]['message']);
+        Event::assertDispatched(
+            ImportFinished::class,
+            fn (ImportFinished $event): bool => $event->userId === $user->id
+                && $event->import->id === $import->id
+                && $event->import->status->value === 'completed_with_errors'
+                && $event->broadcastOn()[0]->name === "private-user.{$user->id}"
+                && $event->broadcastWith()['failed_rows'] === 1,
+        );
 
         app()->call([new ProcessImportChunkJob($import->id), 'handle']);
 
@@ -86,6 +98,61 @@ class ImportTest extends TestCase
         $this->actingAs($otherUser, 'sanctum')
             ->getJson("/api/imports/{$import->id}")
             ->assertNotFound();
+    }
+
+    public function test_import_owner_can_authorize_the_private_websocket_channel(): void
+    {
+        $this->useReverbBroadcasterForChannelAuthorization();
+        $owner = User::factory()->create();
+        $channel = "private-user.{$owner->id}";
+
+        $this->actingAs($owner, 'web')
+            ->postJson('/broadcasting/auth', [
+                'socket_id' => '123.456',
+                'channel_name' => $channel,
+            ])
+            ->assertOk();
+    }
+
+    public function test_other_users_cannot_authorize_a_private_import_websocket_channel(): void
+    {
+        $this->useReverbBroadcasterForChannelAuthorization();
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $this->assertNotSame($owner->id, $otherUser->id);
+
+        $this->actingAs($otherUser, 'web');
+        $this->assertAuthenticatedAs($otherUser, 'web');
+
+        $this->postJson('/broadcasting/auth', [
+            'socket_id' => '789.012',
+            'channel_name' => "private-user.{$owner->id}",
+        ])->assertForbidden();
+    }
+
+    private function useReverbBroadcasterForChannelAuthorization(): void
+    {
+        $channelAuthorizer = Broadcast::getChannels()->get('user.{userId}');
+        $this->assertNotNull($channelAuthorizer);
+
+        config([
+            'broadcasting.default' => 'reverb',
+            'broadcasting.connections.reverb.key' => 'test-key',
+            'broadcasting.connections.reverb.secret' => 'test-secret',
+            'broadcasting.connections.reverb.app_id' => 'test-app',
+            'broadcasting.connections.reverb.options' => [
+                'host' => 'localhost',
+                'port' => 8080,
+                'scheme' => 'http',
+                'useTLS' => false,
+            ],
+        ]);
+
+        Broadcast::channel(
+            'user.{userId}',
+            $channelAuthorizer,
+            ['guards' => ['web']],
+        );
     }
 
     public function test_csv_with_an_invalid_header_is_marked_failed_with_a_reason(): void

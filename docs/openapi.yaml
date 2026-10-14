@@ -4,7 +4,9 @@ info:
   version: 1.0.0
   description: |
     REST API for financial transactions, dashboard summaries, and asynchronous CSV imports.
-    All endpoints except registration and login require a Laravel Sanctum bearer token.
+    Native API clients can authenticate with Sanctum bearer tokens. The first-party web frontend
+    should use the `/session/*` endpoints, which authenticate with an HttpOnly session cookie and
+    require the Sanctum CSRF cookie/header flow.
 servers:
   - url: http://localhost/api
     description: Local development
@@ -14,6 +16,22 @@ tags:
   - name: Transactions
   - name: Imports
 paths:
+  /sanctum/csrf-cookie:
+    get:
+      servers:
+        - url: http://localhost
+          description: Local development
+      tags: [Authentication]
+      summary: Get the browser CSRF cookie
+      description: Call this before browser session registration, login, logout, or other state-changing requests.
+      responses:
+        '204':
+          description: CSRF cookie set
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: Sets the XSRF-TOKEN cookie used to generate the X-XSRF-TOKEN request header.
   /register:
     post:
       tags: [Authentication]
@@ -69,6 +87,102 @@ paths:
                 message: The provided credentials are invalid.
         '422':
           $ref: '#/components/responses/ValidationError'
+  /session/register:
+    post:
+      tags: [Authentication]
+      summary: Register a browser session
+      description: Creates a user and authenticates the browser using a server-side session. No API token is issued or returned.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered; the session cookie is set as HttpOnly
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: HttpOnly session cookie. Obtain a CSRF cookie before this request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /session/login:
+    post:
+      tags: [Authentication]
+      summary: Start a browser session
+      description: Authenticates the browser with a server-side session; no bearer token is returned.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated; the session cookie is set as HttpOnly
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: HttpOnly session cookie. Obtain a CSRF cookie before this request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: The provided credentials are invalid.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /session/user:
+    get:
+      tags: [Authentication]
+      summary: Get the user from the current browser session
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Authenticated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /session/logout:
+    post:
+      tags: [Authentication]
+      summary: End the browser session
+      description: Requires the XSRF-TOKEN cookie and matching X-XSRF-TOKEN header.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        '200':
+          description: Session invalidated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Session ended.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /logout:
     post:
       tags: [Authentication]
@@ -105,8 +219,10 @@ paths:
     get:
       tags: [Dashboard]
       summary: Get income, expenses, and balance totals
+      description: After a successful CSV import, totals include only transactions from the user's latest completed import. Before the first successful import, all of the user's transactions are included.
       security:
         - bearerAuth: []
+        - sessionCookie: []
       responses:
         '200':
           description: Dashboard totals for the authenticated user
@@ -129,8 +245,10 @@ paths:
     get:
       tags: [Transactions]
       summary: List the authenticated user's transactions
+      description: After a successful CSV import, this list contains only transactions from the user's latest completed import. Earlier CSV imports and manually created transactions remain stored but are excluded.
       security:
         - bearerAuth: []
+        - sessionCookie: []
       parameters:
         - name: type
           in: query
@@ -179,6 +297,8 @@ paths:
       summary: Create a transaction
       security:
         - bearerAuth: []
+        - sessionCookie: []
+          csrfToken: []
       requestBody:
         required: true
         content:
@@ -217,6 +337,8 @@ paths:
         to poll its status.
       security:
         - bearerAuth: []
+        - sessionCookie: []
+          csrfToken: []
       requestBody:
         required: true
         content:
@@ -252,6 +374,7 @@ paths:
       summary: Get import status and row-level errors
       security:
         - bearerAuth: []
+        - sessionCookie: []
       responses:
         '200':
           description: Import status
@@ -275,6 +398,8 @@ paths:
       summary: Pause a processing import
       security:
         - bearerAuth: []
+        - sessionCookie: []
+          csrfToken: []
       responses:
         '200':
           $ref: '#/components/responses/ImportTransition'
@@ -290,6 +415,8 @@ paths:
       summary: Resume a paused import
       security:
         - bearerAuth: []
+        - sessionCookie: []
+          csrfToken: []
       responses:
         '200':
           $ref: '#/components/responses/ImportTransition'
@@ -305,6 +432,8 @@ paths:
       summary: Cancel an unfinished import
       security:
         - bearerAuth: []
+        - sessionCookie: []
+          csrfToken: []
       responses:
         '200':
           $ref: '#/components/responses/ImportTransition'
@@ -318,6 +447,16 @@ components:
       type: http
       scheme: bearer
       bearerFormat: Sanctum API token
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: amar-assist-session
+      description: HttpOnly Laravel session cookie used by the first-party browser frontend
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-XSRF-TOKEN
+      description: URL-decoded value of the XSRF-TOKEN cookie
   parameters:
     ImportId:
       name: import
@@ -442,6 +581,16 @@ components:
             token:
               type: string
               description: Sanctum bearer token; store securely and send in the Authorization header
+    SessionResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [user]
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
     User:
       type: object
       properties:

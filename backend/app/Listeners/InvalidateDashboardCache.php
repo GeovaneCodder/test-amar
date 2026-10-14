@@ -9,6 +9,6 @@ final class InvalidateDashboardCache
 {
     public function handle(TransactionsImported $event): void
     {
-        Cache::forget("dashboard:summary:{$event->userId}");
+        Cache::forget("dashboard:summary:v3:{$event->userId}");
     }
 }

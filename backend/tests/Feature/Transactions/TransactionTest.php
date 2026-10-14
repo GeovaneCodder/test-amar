@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Transactions;
 
+use App\Infrastructure\Persistence\Eloquent\Models\Import;
 use App\Infrastructure\Persistence\Eloquent\Models\Transaction;
 use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -71,5 +72,69 @@ class TransactionTest extends TestCase
             ->assertOk()
             ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.description', 'Minha transação');
+    }
+
+    public function test_transaction_list_only_shows_transactions_from_the_latest_completed_csv_import(): void
+    {
+        $user = User::factory()->create();
+        $olderImport = Import::create([
+            'user_id' => $user->id,
+            'file_path' => 'imports/older.csv',
+            'fingerprint' => hash('sha256', 'older'),
+            'status' => 'completed',
+        ]);
+        $latestImport = Import::create([
+            'user_id' => $user->id,
+            'file_path' => 'imports/latest.csv',
+            'fingerprint' => hash('sha256', 'latest'),
+            'status' => 'completed',
+        ]);
+        $pendingImport = Import::create([
+            'user_id' => $user->id,
+            'file_path' => 'imports/pending.csv',
+            'fingerprint' => hash('sha256', 'pending'),
+            'status' => 'processing',
+        ]);
+
+        Transaction::create([
+            'user_id' => $user->id,
+            'import_id' => $olderImport->id,
+            'transaction_date' => '2026-10-10',
+            'description' => 'CSV anterior',
+            'amount_minor' => 10000,
+            'type' => 'income',
+        ]);
+        Transaction::create([
+            'user_id' => $user->id,
+            'import_id' => null,
+            'transaction_date' => '2026-10-11',
+            'description' => 'Lançamento manual antigo',
+            'amount_minor' => 20000,
+            'type' => 'income',
+        ]);
+        Transaction::create([
+            'user_id' => $user->id,
+            'import_id' => $latestImport->id,
+            'transaction_date' => '2026-10-12',
+            'description' => 'CSV atual',
+            'amount_minor' => 30000,
+            'type' => 'income',
+        ]);
+        Transaction::create([
+            'user_id' => $user->id,
+            'import_id' => $pendingImport->id,
+            'transaction_date' => '2026-10-13',
+            'description' => 'CSV ainda processando',
+            'amount_minor' => 40000,
+            'type' => 'income',
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/transactions')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.description', 'CSV atual');
+
+        $this->assertDatabaseCount('transactions', 4);
     }
 }
