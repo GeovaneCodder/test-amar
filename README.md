@@ -90,7 +90,7 @@ Com o worker novamente em execução, a fila deverá ser processada. Ao finaliza
 
 **Resultado esperado:** o upload é registrado, o processamento aguarda a disponibilidade do worker, o usuário pode navegar pela aplicação e a conclusão do processamento é comunicada pela interface.
 
-Caso a notificação não apareça, consulte os logs dos serviços envolvidos para identificar possíveis falhas no processamento ou na comunicação com o frontend:
+Caso a notificação não apareça, consulte os logs do serviço de filas:
 
 ```bash
 docker compose logs --tail=100 queue
@@ -109,3 +109,11 @@ Ao acessar o link, clique em **Regenerate** para gerar o diagrama.
 A especificação dos endpoints está disponível no arquivo [`docs/openapi.yaml`](./docs/openapi.yaml), no formato OpenAPI.
 
 O arquivo documenta os contratos da API e pode ser utilizado por ferramentas compatíveis para consultar os endpoints, seus parâmetros e as estruturas de requisição e resposta.
+
+## Autor
+
+**Geovane** — Desenvolvedor de software.
+
+Conheça outros projetos e confira meu trabalho no portfólio:
+
+[geovane-ashen.vercel.app](https://geovane-ashen.vercel.app/)
