@@ -1,9 +1,13 @@
-## Build em ambiente de desenvolvimento
+# Build em ambiente de desenvolvimento
 
-Para subir a aplicação orquestrada localmente: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+Para subir a aplicação orquestrada localmente
+```text
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
 
-## Diagrama da aplicação
+# Diagrama da aplicação
 Diagrama da aplicação: https://gitdiagram.com/geovanecodder/test-amar
+Clique em "regenerate".
 
 ### Obs
 A mesma planilha nunca será upada duas vezes, há uma parte do código que cria uma impressão digital
